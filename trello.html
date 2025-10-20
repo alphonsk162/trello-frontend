@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>board | Trello</title>
+    <style>
+        [v-cloak] {
+        display: none !important;
+        }
+        body{
+        background-color: #c75b9e;
+        }
+        header{
+            position: fixed;  
+            background-color: rgba(82, 79, 79, 0.5);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50px;
+            padding-left: 20px;
+            padding-top: 10px;
+            z-index: 100;
+        }
+        header h1{
+            color: white;
+            font-size: medium;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .add-list button{
+            background-color: rgba(221, 214, 214, 0.5);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            color: rgb(255, 255, 255);
+            font-size: medium;
+        
+        }
+        .add-list-form{
+            background-color: rgb(230, 225, 225);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .list{
+            background-color: rgb(240, 238, 238);
+            width: 250px;
+            min-height: 100px;
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            word-wrap: break-word;     
+            overflow-wrap: break-word;
+        }
+        .add-card-btn{
+            background:none;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            color: rgb(82, 79, 79);
+            font-size: medium;
+        }
+
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>board</h1>
+    </header>
+
+    <div id="app"  v-cloak style="margin-top:60px; display:flex; gap:10px; padding:10px;">
+        <div v-for="(list, index) in lists" :key="index" class="list">
+            <h3 style="font-size: medium; color: #333333;">{{ list.title }}</h3>
+
+            <div v-for="(card, cIndex) in list.cards" :key="cIndex" class="card" style="background-color: white; border-radius:5px; padding:5px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);">
+                <div style="display: flex; align-items: flex-start; gap: 5px;">
+                    <input 
+                        v-model="lists[index].cards[cIndex].done" 
+                        type="checkbox"
+                        @click.stop
+                    />
+                    <div
+                        @click="openCardModal(index, cIndex)"
+                        style="flex: 1; min-width: 0; white-space: normal; cursor: pointer;
+                            overflow-wrap: anywhere;
+                            word-break: break-word;"
+                    >
+                        {{ card.text }}
+                    </div>
+                </div>
+            </div>
+            
+            <button @click="displayAddCardForm(index)" class="add-card-btn" style="width:230px; height: 40px; text-align: left; padding-left: 10px;">
+                + Add a card
+            </button>    
+            <div class="add-card-form" style="display:none; flex-direction: column;">
+                <input v-model="newCard" placeholder="Enter a title or paste a link..." style="width:220px; height:30px; border-radius:5px; border:none; padding-left:5px;" />
+                <div>
+                <button @click="addCard(index)" style="margin-top:10px; width:90px; height:35px; border:none; border-radius:5px; background-color: #423ff3; color:white; cursor:pointer; font-size: medium;">
+                    Add Card
+                </button>
+                <button @click="hideAddCardForm" style="margin-top:10px; background-color: none; margin-left:10px; width:30px; height:30px; border:none; border-radius:5px; color:rgb(0, 0, 0); cursor:pointer; font-size: medium;">
+                    X
+                </button>
+                </div>
+            </div>       
+        </div>
+        <div class="add-list">
+            <button @click="displayAddListForm" style="width:230px; height: 40px; text-align: left; padding-left: 10px;">
+                + Add another list
+            </button>
+            <div class="add-list-form" style="display:none; flex-direction: column;">
+                <textarea 
+                v-model="newList" 
+                placeholder="Enter list title..."
+                style="width:220px; min-height:30px; border-radius:5px; border:none; padding:5px; resize:none; overflow:hidden;"
+                ></textarea>
+
+                <div>
+                <button @click="addList" style="margin-top:10px; width:70px; height:30px; border:none; border-radius:5px; background-color: #423ff3; color:white; cursor:pointer; font-size: medium;">
+                    Add list
+                </button>
+                <button @click="hideAddListForm" style="margin-top:10px; background-color: none; margin-left:10px; width:30px; height:30px; border:none; border-radius:5px; color:rgb(0, 0, 0); cursor:pointer; font-size: medium;">
+                    X
+                </button>
+                </div>
+            </div>
+
+            <div 
+                v-if="activeCard !== null" 
+                @click="closeCardModal"
+                style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;"
+            >
+                <div 
+                    @click.stop
+                    style="background: white; border-radius: 8px; padding: 20px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;"
+                >
+                    <h2 style="margin: 0 0 20px 0; font-size: 20px;">{{ activeCard.text }}</h2>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h3 style="margin: 0; font-size: 16px;">Description</h3>
+                            <button 
+                                v-if="activeCard.description && !editingDescription"
+                                @click="editingDescription = true"
+                                style="padding: 5px 10px; background: #0079bf; color: white; border: none; border-radius: 3px; cursor: pointer;"
+                            >
+                                Edit
+                            </button>
+                        </div>
+                        
+                        <textarea
+                            v-if="!activeCard.description || editingDescription"
+                            v-model="activeCard.description"
+                            @blur="saveDescription"
+                            placeholder="Add a more detailed description..."
+                            style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 3px; resize: vertical; font-family: inherit;"
+                        ></textarea>
+                        
+                        <div 
+                            v-else
+                            style="padding: 8px; background: #f4f5f7; border-radius: 3px; white-space: pre-wrap;"
+                        >
+                            {{ activeCard.description }}
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 16px;">Checklist</h3>
+                        
+                        <div v-for="(item, iIndex) in activeCard.items" :key="iIndex" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <input type="checkbox" v-model="item.done" @change="saveToLocalStorage" />
+                            <span :style="{ textDecoration: item.done ? 'line-through' : 'none' }">{{ item.text }}</span>
+                        </div>
+                        
+                        <input
+                            v-model="newChecklistItem"
+                            @keyup.enter="addChecklistItem"
+                            placeholder="Add an item"
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; margin-top: 8px;"
+                        />
+                        <button
+                            @click="addChecklistItem"
+                            style="margin-top: 8px; padding: 8px 16px; background: #0079bf; color: white; border: none; border-radius: 3px; cursor: pointer;"
+                        >
+                            Add Item
+                        </button>
+                    </div>
+                    
+                    <button
+                        @click="closeCardModal"
+                        style="padding: 8px 16px; background: #ccc; color: #333; border: none; border-radius: 3px; cursor: pointer;"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script>
+    const app = Vue.createApp({
+        data() {
+            return {
+                newList: "",
+                newCard: "",
+                lists: [],
+                activeCard: null,
+                activeListIndex: null,
+                activeCardIndex: null,
+                editingDescription: false,
+                newChecklistItem: ''
+            };
+        },
+        mounted() {
+            this.loadFromLocalStorage();
+        },
+        watch: {
+            lists: {
+                handler() {
+                    this.saveToLocalStorage();
+                },
+                deep: true
+            }
+        },
+        methods: {
+            saveToLocalStorage() {
+                try {
+                    localStorage.setItem('trelloLists', JSON.stringify(this.lists));
+                    console.log('Data saved to localStorage');
+                } catch (e) {
+                    console.error('Error saving to localStorage:', e);
+                }
+            },
+            
+            loadFromLocalStorage() {
+                try {
+                    const savedLists = localStorage.getItem('trelloLists');
+                    if (savedLists) {
+                        this.lists = JSON.parse(savedLists);
+                        console.log('Data loaded from localStorage');
+                    }
+                } catch (e) {
+                    console.error('Error loading from localStorage:', e);
+                }
+            },
+            
+            displayAddListForm() {
+                const form = document.querySelector('.add-list-form');
+                const button = document.querySelector('.add-list button');
+                button.style.display = 'none';
+                form.style.display = 'flex';
+            },
+            
+            hideAddListForm() {
+                const form = document.querySelector('.add-list-form');
+                const button = document.querySelector('.add-list button');
+                button.style.display = 'block';
+                form.style.display = 'none';
+            },
+            
+            addList() {  
+                if (this.newList.trim() !== "") {
+                    this.lists.push({ title: this.newList, cards: [] });
+                    this.newList = "";
+                    this.hideAddListForm();
+                }  
+            },
+            
+            displayAddCardForm(index) {
+                const listElements = document.querySelectorAll('.list');
+                const form = listElements[index].querySelector('.add-card-form');
+                const button = listElements[index].querySelector('.add-card-btn');
+                button.style.display = 'none';
+                form.style.display = 'flex';
+            },
+            
+            hideAddCardForm() {
+                const listElements = document.querySelectorAll('.list');
+                listElements.forEach(listElement => {
+                    const form = listElement.querySelector('.add-card-form');
+                    const button = listElement.querySelector('.add-card-btn');
+                    button.style.display = 'block';
+                    form.style.display = 'none';
+                });
+            },
+            
+            addCard(index) {
+                if (this.newCard.trim() !== "") {
+                    this.lists[index].cards.push({ 
+                        text: this.newCard, 
+                        done: false, 
+                        items: [], 
+                        description: "" 
+                    });
+                    this.newCard = "";
+                    this.hideAddCardForm();     
+                }
+            }, 
+            
+            toggleCardDone(listIndex, cardIndex) {
+                this.lists[listIndex].cards[cardIndex].done = !this.lists[listIndex].cards[cardIndex].done;
+            },
+            
+            openCardModal(listIndex, cardIndex) {
+                this.activeListIndex = listIndex;
+                this.activeCardIndex = cardIndex;
+                this.activeCard = this.lists[listIndex].cards[cardIndex];
+                this.editingDescription = false;
+                this.newChecklistItem = '';
+                
+                if (!this.activeCard.items) {
+                    this.activeCard.items = [];
+                }
+                if (!this.activeCard.description) {
+                    this.activeCard.description = '';
+                }
+            },
+            
+            closeCardModal() {
+                this.activeCard = null;
+                this.activeListIndex = null;
+                this.activeCardIndex = null;
+                this.editingDescription = false;
+                this.newChecklistItem = '';
+            },
+            
+            saveDescription() {
+                this.editingDescription = false;
+                this.saveToLocalStorage();
+            },
+            
+            addChecklistItem() {
+                if (this.newChecklistItem.trim() !== '') {
+                    this.activeCard.items.push({
+                        text: this.newChecklistItem,
+                        done: false
+                    });
+                    this.newChecklistItem = '';
+                }
+            }
+        }
+    });
+    
+    app.mount('#app');
+</script>
+</html>
